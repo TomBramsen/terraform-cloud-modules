@@ -1,57 +1,57 @@
-variable "cloud_provider" {
-  type        = string
-  description = "Cloud provider to deploy Kubernetes to: 'ovh' or 'azure'"
-  validation {
-    condition     = contains(["ovh", "azure"], var.cloud_provider)
-    error_message = "cloud_provider must be 'ovh' or 'azure'."
-  }
-}
-
-variable "kube_cluster" {
+variable "cluster_config" {
   type = object({
-    name            = string
-    version         = string
-    ip_restrictions = optional(list(string), [])
+    cluster_name = string
+    environment  = string
+    k8s_version = optional(string, "1.34") # Kubernetes major.minor version (e.g., "1.34")
+    tags         = optional(map(string), {}) # Shared infrastructure resource tags
   })
-  description = "Common Kubernetes cluster configuration shared across all cloud providers"
+  description = "General cluster metadata and tagging"
 }
 
-variable "kube_node_pools" {
-  type = map(object({
-    size        = string
-    nodes_count = number
-    nodes_min   = number
-    nodes_max   = number
-    labels      = optional(map(string), {})
-    taints = optional(list(object({
+variable "node_config" {
+  type = object({
+    node_size   = string            # T-shirt size ("small", "medium", "large") or direct VM SKU
+    node_count  = number            # Desired base/initial node count
+    autoscale_enabled  = bool           # Shared autoscale switch
+    min_count          = optional(number, null)
+    max_count          = optional(number, null)
+    availability_zones = optional(list(string), []) # Shared availability zones list
+    image_id    = optional(string,"1.34")  # Optional custom image ID for node pool
+
+    labels      = optional(map(string), {}) # Kubernetes node labels
+    taints      = optional(list(object({     # Kubernetes node taints
       key    = string
       value  = string
       effect = string
     })), [])
-  }))
-  default     = {}
-  description = "Node pools to create. For Azure, one entry must match azure_config.default_node_pool_name."
+  })
+  description = "Unified sizing, scaling, labeling, and taint configurations for the default node pool"
 }
 
-# OVH-specific configuration
-variable "ovh_config" {
+variable "flux_config" {
   type = object({
-    project_id = string
-    region     = string
+    cluster_repo   = string
+    bootstrap_path = string
+    git_auth = map(object({
+      username = optional(string, "")
+      password = optional(string, "")
+      identity = optional(string, "")
+    }))
   })
   default     = null
-  description = "OVH-specific configuration. Required when cloud_provider = 'ovh'."
+  description = "Optional Flux/GitOps bootstrap config. If null, no bootstrap is run. Works for both Azure and OVH via kubeconfig."
 }
 
-# Azure-specific configuration
-variable "azure_config" {
+variable "cloud_settings" {
   type = object({
-    location               = string
-    resource_group         = string
-    dns_prefix             = optional(string, null)
-    default_node_pool_name = optional(string, "system")
-    vnet_subnet_id         = optional(string, null)
+    cloud_provider     = string # "azure" or "ovh"
+    region             = string # Maps to 'location' in Azure / 'region' in OVH
+    project_identifier = string # Maps to 'resource_group' in Azure / 'ovh_project_id' in OVH
+    
+    # Optional networking and provider-specific configurations
+    network_id         = optional(string, null) # vnet_subnet_id (Azure) / private_network_id (OVH)
+    ip_restrictions    = optional(list(string), [])
+    azure_dns_prefix   = optional(string, null)
   })
-  default     = null
-  description = "Azure-specific configuration. Required when cloud_provider = 'azure'."
+  description = "Cloud provider landing zone and networking settings"
 }

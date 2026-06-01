@@ -1,44 +1,51 @@
 # Create an OVHcloud Managed Kubernetes cluster
 resource "ovh_cloud_project_kube" "kube_cluster" {
-  service_name = var.ovh_project_id
-  name         = var.kube_cluster.name
-  region       = var.ovh_region
-  version      = var.kube_cluster.version
+  service_name       = var.cloud_settings.ovh_project_id
+  name               = var.cluster_config.name
+  region             = var.cloud_settings.ovh_region
+  version            = var.cluster_config.version
+  private_network_id = var.cloud_settings.private_network_id
 }
 
-# Create Node Pools 
+# Create Managed Node Pool
 resource "ovh_cloud_project_kube_nodepool" "node_pool" {
-  for_each     = var.kube_node_pools
-
-  service_name  = var.ovh_project_id
+  service_name  = var.cloud_settings.ovh_project_id
   kube_id       = ovh_cloud_project_kube.kube_cluster.id
   
-  # each.key is the pool name (e.g. "frontend" or "backend")
-  name          = each.key
-  flavor_name   = each.value.size
-  desired_nodes = each.value.nodes_count
-  min_nodes     = each.value.nodes_min
-  max_nodes     = each.value.nodes_max
+  name          = "defaultpool"
+  flavor_name   = var.node_config.sku
+  desired_nodes = var.node_config.node_count
+  
+  # Autoscale configuration mapping
+  autoscale     = var.node_config.autoscale_enabled
+  min_nodes     = var.node_config.autoscale_enabled ? var.node_config.min_count : var.node_config.node_count
+  max_nodes     = var.node_config.autoscale_enabled ? var.node_config.max_count : var.node_config.node_count
+  
+  # Availability zones mapping
+  availability_zones = length(var.node_config.availability_zones) > 0 ? var.node_config.availability_zones : null
 
   template {
     metadata {
+      # Restored metadata tracking and deletion handling blocks
       annotations = {
-        managed-by = "terraform"
+        "managed-by" = "terraform"
       }
       finalizers = []
-      labels     = each.value.labels
+      
+      labels = merge({ "environment" = var.cluster_config.environment }, var.node_config.labels)
     }
+    
     spec {
       unschedulable = false
-      taints        = each.value.taints
+      taints        = var.node_config.taints
     }
   }
 }
 
 # Kube-API IP Access restrictions
 resource "ovh_cloud_project_kube_iprestrictions" "restrictions" {
-  count        = length(var.kube_cluster.ip_restrictions) > 0 ? 1 : 0
-  service_name = var.ovh_project_id
+  count        = length(var.cloud_settings.ip_restrictions) > 0 ? 1 : 0
+  service_name = var.cloud_settings.ovh_project_id
   kube_id      = ovh_cloud_project_kube.kube_cluster.id
-  ips          = var.kube_cluster.ip_restrictions
+  ips          = var.cloud_settings.ip_restrictions
 }

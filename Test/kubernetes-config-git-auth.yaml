@@ -1,0 +1,18 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    name: netic-gitops-system
+  name: netic-gitops-system
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: kubernetes-config-git-auth
+  namespace: netic-gitops-system
+type: Opaque
+data:
+      identity: 
+      password: 
+      username: 

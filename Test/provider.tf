@@ -37,7 +37,7 @@ provider "azurerm" {
   subscription_id = var.subscription_id
    resource_provider_registrations = "none"
 }
-
+/*
 provider "openstack" {
   auth_url    = "https://auth.cloud.ovh.net/v3"
   domain_name = "Default"
@@ -47,6 +47,7 @@ provider "openstack" {
   user_name = var.OS_username
   password  = var.OS_password
 }
+*/ 
 
 provider "ovh" {
   endpoint = var.ovh_api_region

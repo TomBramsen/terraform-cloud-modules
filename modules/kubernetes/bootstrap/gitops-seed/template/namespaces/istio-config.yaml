@@ -1,0 +1,287 @@
+apiVersion: project.tcs.trifork.com/v1alpha1
+kind: BootstrapConfig
+metadata:
+  name: default-istio
+  namespace: netic-gitops-system
+spec:
+  sizes:
+    default:
+      limitRange:
+        limits:
+          - type: Container
+            default:
+              memory: 64Mi
+            defaultRequest:
+              cpu: "50m"
+              memory: 64Mi
+      resourceQuota:
+        hard:
+          count/deployments.apps: "50"
+          limits.memory: 24Gi
+          persistentvolumeclaims: "25"
+          requests.cpu: "10"
+          requests.memory: 24Gi
+          requests.storage: 750Gi
+
+  rules: # Role rules for deployment user
+    - apiGroups:
+        - ""
+      resources:
+        - services
+        - configmaps
+        - secrets
+        - persistentvolumeclaims
+        - serviceaccounts
+      verbs:
+        - "*"
+    - apiGroups:
+        - apps
+      resources:
+        - deployments
+        - daemonsets
+        - statefulsets
+        - replicasets
+      verbs:
+        - "*"
+    - apiGroups:
+        - batch
+      resources:
+        - cronjobs
+        - jobs
+      verbs:
+        - "*"
+    - apiGroups:
+        - extensions
+        - networking.k8s.io
+      resources:
+        - ingresses
+      verbs:
+        - "*"
+    - apiGroups:
+        - monitoring.coreos.com
+      resources:
+        - servicemonitors
+        - podmonitors
+        - prometheusrules
+        - probes
+      verbs:
+        - "*"
+    - apiGroups:
+        - projectcontour.io
+      resources:
+        - httpproxies
+      verbs:
+        - "*"
+    - apiGroups:
+        - policy
+      resources:
+        - poddisruptionbudgets
+      verbs:
+        - "*"
+    - apiGroups:
+        - helm.toolkit.fluxcd.io
+      resources:
+        - helmreleases
+      verbs:
+        - "*"
+    - apiGroups:
+        - source.toolkit.fluxcd.io
+      resources:
+        - helmrepositories
+        - gitrepositories
+      verbs:
+        - "*"
+    - apiGroups:
+        - kustomize.toolkit.fluxcd.io
+      resources:
+        - kustomizations
+      verbs:
+        - "*"
+    - apiGroups:
+        - image.toolkit.fluxcd.io
+      resources:
+        - imagepolicies
+        - imagerepositories
+        - imageupdateautomations
+      verbs:
+        - "*"
+    - apiGroups:
+        - notification.toolkit.fluxcd.io
+      resources:
+        - alerts
+        - providers
+        - receivers
+      verbs:
+        - "*"
+    - apiGroups:
+        - external-secrets.io
+      resources:
+        - externalsecrets
+      verbs:
+        - "*"
+    - apiGroups:
+        - autoscaling
+      resources:
+        - horizontalpodautoscalers
+      verbs:
+        - "*"
+    - apiGroups:
+        - cert-manager.io
+      resources:
+        - issuers
+        - issuers/status
+      verbs:
+        - "*"
+    - apiGroups:
+        - networking.istio.io
+      resources:
+        - virtualservices
+      verbs:
+        - "*"
+    - apiGroups:
+        - security.istio.io
+      resources:
+        - authorizationpolicies
+        - peerauthentications
+        - requestauthentications
+      verbs:
+        - "*"
+    - apiGroups:
+        - elasticsearch.k8s.elastic.co
+      resources:
+        - elasticsearches
+      verbs:
+        - "*"
+
+  networkPolicies: # Default network policies - deny-all will always be added
+    default-egress:
+      podSelector: {}
+      policyTypes:
+        - Egress
+      egress:
+        - ports:
+            - protocol: TCP # DNS
+              port: 53
+            - protocol: UDP # DNS
+              port: 53
+            - protocol: TCP # https
+              port: 443
+            - protocol: TCP # PostgreSQL
+              port: 5432
+        - to:
+            - ipBlock:
+                cidr: 169.254.169.254/32 # Azure API
+    istio-ingress:
+      podSelector: {}
+      policyTypes:
+        - Ingress
+      ingress:
+        - from:
+            - namespaceSelector:
+                matchLabels:
+                  name: istio-ingress
+          ports:
+            - protocol: TCP
+              port: http
+    istio-sidecar-monitoring:
+      podSelector:
+        matchLabels:
+          sidecar.istio.io/inject: "true"
+      policyTypes:
+        - Ingress
+      ingress:
+        - from: # Prometheus to scrape Istio sidecar
+            - namespaceSelector: {}
+              podSelector:
+                matchLabels:
+                  app.kubernetes.io/name: prometheus
+          ports:
+            - protocol: TCP
+              port: http-envoy-prom
+    istiod:
+      podSelector: {}
+      policyTypes:
+        - Egress
+      egress:
+        - to:
+            - namespaceSelector:
+                matchLabels:
+                  name: istio-system
+              podSelector:
+                matchLabels:
+                  app: istiod
+          ports:
+            - port: 15012
+              protocol: TCP
+
+  labels: # Labels to add on namespace resource
+    netic.dk/monitoring: customer
+    netic.dk/enforce-policies: "true"
+
+  git:
+    github:
+      template:
+        owner: trifork
+        repo: tcs-gotk
+        adminTeam: tcs-admins
+      secretRef: tcs-github-auth
+
+  vault:
+    server: $VAULT_SERVER
+    mount: ${DOLLAR}{cluster_provider}
+    auth:
+      mount: ${DOLLAR}{cluster_provider}/k8s/${DOLLAR}{cluster_name}
+      role: tcs-namespace-operator
+      serviceAccountRef: tcs-namespace-operator-controller-manager
+    namespaceList: k8s/${DOLLAR}{cluster_name}/netic-gitops-system/tcs-namespaces
+    pathPrefix: k8s/${DOLLAR}{cluster_name}/{{ .Namespace }}
+    data:
+      - name: dockerhub-registry-creds
+        path: k8s/${DOLLAR}{cluster_name}/netic-gitops-system/dockerhub-registry-creds
+
+  externalSecretsStore:
+    provider:
+      vault:
+        auth:
+          kubernetes:
+            mountPath: ${DOLLAR}{cluster_provider}/k8s/${DOLLAR}{cluster_name}
+            role: external-secrets
+            secretRef:
+              name: external-secrets-token
+        path: ${DOLLAR}{cluster_provider}
+        server: $VAULT_SERVER
+        version: v2
+
+  openTelemetryCollector:
+    config: |
+      receivers:
+        otlp:
+          protocols:
+            grpc:
+        jaeger:
+          protocols:
+            grpc:
+            thrift_compact:
+
+      processors:
+        batch:
+        resource:
+          attributes:
+          - key: provider
+            value: "${DOLLAR}{cluster_provider}"
+            action: upsert
+          - key: cluster
+            value: "${DOLLAR}{cluster_name}"
+            action: upsert
+
+      exporters:
+        otlphttp:
+          endpoint: $OTEL_SERVER
+        logging:
+
+      service:
+        pipelines:
+          traces:
+            receivers: [otlp, jaeger]
+            processors: [batch,resource]
+            exporters: [logging, otlphttp]

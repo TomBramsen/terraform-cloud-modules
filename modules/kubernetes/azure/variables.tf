@@ -1,29 +1,33 @@
-variable "kube_cluster" {
+variable "cluster_config" {
   type = object({
-    name                   = string
-    version                = string
-    location               = string
-    resource_group         = string
-    dns_prefix             = optional(string, null)
-    default_node_pool_name = optional(string, "system")
-    ip_restrictions        = optional(list(string), [])
-    vnet_subnet_id         = optional(string, null)
+    name        = string
+    environment = string
+    version     = string
   })
-  description = "AKS cluster configuration. Node pool names must be <= 12 lowercase alphanumeric characters."
+  description = "Core Kubernetes cluster settings"
 }
 
-variable "kube_node_pools" {
-  type = map(object({
-    size        = string
-    nodes_count = number
-    nodes_min   = number
-    nodes_max   = number
-    labels      = optional(map(string), {})
-    taints = optional(list(object({
-      key    = string
-      value  = string
-      effect = string
-    })), [])
-  }))
-  description = "Map of node pools. One entry must match kube_cluster.default_node_pool_name — it becomes the AKS system pool."
+variable "node_config" {
+type = object({
+    sku                = string
+    node_count         = number
+    autoscale_enabled  = bool
+    min_count          = number
+    max_count          = number
+   availability_zones = optional(list(string), []) # Shared availability zones list
+     labels             = map(string)
+    taints             = list(any)
+  })
+  description = "Default node pool sizing and scaling settings"
+}
+
+variable "cloud_settings" {
+  type = object({
+    resource_group  = string
+    location        = string
+    dns_prefix      = string
+    vnet_subnet_id  = optional(string)
+    ip_restrictions = optional(list(string), [])
+  })
+  description = "Azure infrastructure and network specific settings"
 }

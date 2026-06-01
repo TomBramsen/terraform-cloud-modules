@@ -1,35 +1,32 @@
-variable "ovh_project_id" {
-  type        = string
-  description = "OVH Public Cloud Project ID"
-}
-
-variable "ovh_region" {
-  type        = string
-  description = "OVH Region (fx GRA11)"
-}
-
-## Kubernetes Managed Cluster instance
-variable "kube_cluster" {
+variable "cluster_config" {
   type = object({
-    name            = string
-    version         = string
-    ip_restrictions = optional(list(string), [])
+    name        = string
+    environment = string
+    version     = string
   })
+  description = "Core Kubernetes cluster settings"
 }
 
-# All the nodepools for the above Cluster
-variable "kube_node_pools" {
-  type = map(object({
-    size        = string
-    nodes_count = number
-    nodes_min   = number
-    nodes_max   = number
-    labels      = optional(map(string), {})
-    taints      = optional(list(object({
-      key    = string
-      value  = string
-      effect = string
-    })), [])
-  }))
-  default = {}
+variable "node_config" {
+  type = object({
+    sku                = string
+    node_count         = number
+    autoscale_enabled  = bool
+    min_count          = number
+    max_count          = number
+   availability_zones = optional(list(string), []) # Shared availability zones list
+      labels             = map(string)
+    taints             = list(any)
+  })
+  description = "Default node pool sizing and scaling settings"
+}
+
+variable "cloud_settings" {
+  type = object({
+    ovh_project_id     = string
+    ovh_region         = string
+    private_network_id = optional(string)
+    ip_restrictions    = optional(list(string), [])
+  })
+  description = "OVHcloud infrastructure and network specific settings"
 }

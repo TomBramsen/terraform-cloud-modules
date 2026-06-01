@@ -1,30 +1,84 @@
-# Terraform evaluates module arguments even when count = 0, so cloud-specific
-# configs use try() to avoid null-access errors when that provider is not selected.
-
-module "ovh" {
-  count  = var.cloud_provider == "ovh" ? 1 : 0
-  source = "../ovh"
-
-  ovh_project_id  = try(var.ovh_config.project_id, "")
-  ovh_region      = try(var.ovh_config.region, "")
-  kube_cluster    = var.kube_cluster
-  kube_node_pools = var.kube_node_pools
-}
-
-module "azure" {
-  count  = var.cloud_provider == "azure" ? 1 : 0
+# --- CALL YOUR AZURE MODULE ---
+module "azure_k8s_cluster" {
   source = "../azure"
+  count  = var.cloud_settings.cloud_provider == "azure" ? 1 : 0
 
-  kube_cluster = {
-    name                   = var.kube_cluster.name
-    version                = var.kube_cluster.version
-    location               = try(var.azure_config.location, "")
-    resource_group         = try(var.azure_config.resource_group, "")
-    dns_prefix             = try(var.azure_config.dns_prefix, null)
-    default_node_pool_name = try(var.azure_config.default_node_pool_name, "system")
-    vnet_subnet_id         = try(var.azure_config.vnet_subnet_id, null)
-    ip_restrictions        = var.kube_cluster.ip_restrictions
+  cluster_config = {
+    name        = var.cluster_config.cluster_name
+    environment = var.cluster_config.environment
+    version     = var.cluster_config.k8s_version
+    tags        = var.cluster_config.tags
   }
 
-  kube_node_pools = var.kube_node_pools
+  node_config = {
+    sku                = local.resolved_node_sku # BEHOLD DENNE! Azure SKAL have hardware-størrelsen her
+    node_count         = var.node_config.node_count
+    autoscale_enabled  = var.node_config.autoscale_enabled
+    min_count          = var.node_config.min_count
+    max_count          = var.node_config.max_count
+    availability_zones = var.node_config.availability_zones
+    labels             = var.node_config.labels
+    taints             = var.node_config.taints
+  }
+
+  cloud_settings = {
+    resource_group  = var.cloud_settings.project_identifier
+    location        = var.cloud_settings.region
+    dns_prefix      = coalesce(var.cloud_settings.azure_dns_prefix, var.cluster_config.cluster_name)
+    vnet_subnet_id  = var.cloud_settings.network_id
+    ip_restrictions = var.cloud_settings.ip_restrictions
+  }
+}
+
+# --- CALL YOUR OVH MODULE ---
+module "ovh_k8s_cluster" {
+  source = "../ovh"
+  count  = var.cloud_settings.cloud_provider == "ovh" ? 1 : 0
+
+  cluster_config = {
+    name        = var.cluster_config.cluster_name
+    environment = var.cluster_config.environment
+    version     = var.cluster_config.k8s_version
+  }
+
+  node_config = {
+    sku               = local.resolved_node_sku # OVH skal også bruge sin hardware flavor
+    node_count        = var.node_config.node_count
+    autoscale_enabled = var.node_config.autoscale_enabled
+    min_count         = var.node_config.min_count
+    max_count         = var.node_config.max_count
+    availability_zones = var.node_config.availability_zones
+    labels            = var.node_config.labels
+    taints            = var.node_config.taints
+    # NOTE: Ingen 'os_sku' eller 'node_image' her, da OVH ikke understøtter det.
+  }
+
+  cloud_settings = {
+    ovh_project_id     = var.cloud_settings.project_identifier
+    ovh_region         = var.cloud_settings.region
+    private_network_id = var.cloud_settings.network_id
+    ip_restrictions    = var.cloud_settings.ip_restrictions
+  }
+}
+
+
+
+
+# --- OPTIONAL FLUX / GITOPS BOOTSTRAP ---
+# Runs after whichever cloud cluster was provisioned.
+# Uses kubeconfig directly, so it works identically for Azure and OVH.
+module "flux_bootstrap" {
+  source = "../bootstrap/gitops"
+  count  = var.flux_config != null ? 1 : 0
+
+  kubeconfig = one(concat(
+    module.azure_k8s_cluster[*].kubeconfig,
+    module.ovh_k8s_cluster[*].kubeconfig
+  ))
+
+  cluster_repo   = var.flux_config.cluster_repo
+  bootstrap_path = var.flux_config.bootstrap_path
+  git_auth       = var.flux_config.git_auth
+
+  depends_on = [module.azure_k8s_cluster, module.ovh_k8s_cluster]
 }

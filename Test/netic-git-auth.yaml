@@ -1,0 +1,18 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    name: netic-gitops-system
+  name: netic-gitops-system
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: netic-git-auth
+  namespace: netic-gitops-system
+type: Opaque
+data:
+      identity: 
+      password: QkJEQy1OVFEzT0RVd01UQTVOalkyT2pGTHhWQ1htWE5ZQmtkT04wWHdJcVVvd0c3cA==
+      username: dGJyJTQwbmV0aWMuZGs=

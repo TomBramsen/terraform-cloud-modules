@@ -1,7 +1,3 @@
-output "resource_group" {
-  description = "Name of the created resource group"
-  value       = azurerm_resource_group.rg.name
-}
 
 output "vnet_id" {
   description = "ID of the virtual network"
@@ -29,10 +25,6 @@ output "cluster_id" {
   value       = module.kubernetes.cluster_id
 }
 
-output "cluster_name" {
-  description = "Name of the AKS cluster"
-  value       = module.kubernetes.cluster_name
-}
 
 output "kubeconfig" {
   description = "Raw kubeconfig — pipe to a file or use with KUBECONFIG env var"
