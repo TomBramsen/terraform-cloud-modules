@@ -1,0 +1,67 @@
+name: 'AKS_and_VPN'
+run-name: "AKS_VPN by @${{ github.actor }})"
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment"
+        required: true
+        default: "test"
+        type: choice
+        options:
+          - test
+          - prod
+          - dev
+      action:
+        description: "Action"
+        required: true
+        type: choice
+        default: "plan"
+        options:
+          - plan
+          - deploy
+          - destroy
+
+  #push:
+  #  branches:
+  #    - main # Kører automatisk ved merge/push til main
+
+permissions:
+  contents: read
+
+jobs:
+  # ==========================================
+  # SKRIDT 1: NETVÆRK & VPN
+  # ==========================================
+  deploy_network:
+    uses: ./.github/workflows/deployinfrastructure.yml
+    with:
+      environment: ${{ inputs.environment || 'test' }}
+      action: ${{ inputs.action || 'deploy' }}
+      module: 'network_and_vpn'
+    secrets: inherit
+
+  # ==========================================
+  # SKRIDT 2: CONTAINER REGISTRY (Kører efter netværk)
+  # ==========================================
+  deploy_registry:
+    needs: deploy_network # Venter på at netværket er helt færdigt
+    uses: ./.github/workflows/deployinfrastructure.yml
+    with:
+      environment: ${{ inputs.environment || 'test' }}
+      action: ${{ inputs.action || 'deploy' }}
+      module: 'container_registry'
+    secrets: inherit
+
+  # ==========================================
+  # SKRIDT 3: MANAGED KUBERNETES (Kører til sidst)
+  # ==========================================
+  deploy_kubernetes:
+    needs: deploy_registry # Venter på at både netværk og registry er klar
+    uses: ./.github/workflows/deployinfrastructure.yml
+    with:
+      environment: ${{ inputs.environment || 'test' }}
+      action: ${{ inputs.action || 'deploy' }}
+      module: 'managed_kubernetes'
+    secrets: inherit
