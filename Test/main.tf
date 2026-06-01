@@ -14,8 +14,6 @@ resource "azurerm_resource_group" "rg" {
 
 # =============================================================================
 # Network — VNet with two subnets:
-#   aks     10.0.0.0/22  (1024 IPs for AKS nodes + pods)
-#   default 10.0.8.0/24  (for other resources)
 # =============================================================================
 
 module "network" {
@@ -26,10 +24,10 @@ module "network" {
   azure_config = {
     location       = azurerm_resource_group.rg.location
     resource_group = azurerm_resource_group.rg.name
-    address_space  = ["10.0.0.0/16"]
+    address_space  = ["10.0.12.0/22"]
     subnets = {
-      aks     = { cidr = "10.0.0.0/22" }
-      default = { cidr = "10.0.8.0/24" }
+      aks     = { cidr = "10.0.12.0/24" }
+      default = { cidr = "10.0.13.0/24" }
     }
   }
 }
@@ -59,10 +57,9 @@ module "registry" {
 }
 
 # =============================================================================
-# Kubernetes — AKS with two node pools in the aks subnet:
-#   system   Standard_D2s_v3  (1–5 nodes)   system workloads
-#   workers  Standard_D4s_v3  (0–10 nodes)  application workloads
+# Kubernetes 
 # =============================================================================
+
 
 module "kubernetes" {
   source         = "../modules/kubernetes/wrapper"
@@ -82,16 +79,16 @@ module "kubernetes" {
 
   kube_node_pools = {
     system = {
-      size        = "Standard_D2s_v3"
-      nodes_count = 2
+      size        = "Standard_B2ms"
+      nodes_count = 1
       nodes_min   = 1
-      nodes_max   = 5
+      nodes_max   = 3
     }
     workers = {
-      size        = "Standard_D4s_v3"
+      size        = "Standard_B2ms"
       nodes_count = 1
       nodes_min   = 0
-      nodes_max   = 10
+      nodes_max   = 3
       labels      = { role = "workers" }
     }
   }
