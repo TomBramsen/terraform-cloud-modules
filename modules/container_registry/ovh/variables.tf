@@ -1,8 +1,6 @@
-# modules/ovh_container_registry/variables.tf
-
 variable "ovh_project_id" {
   type        = string
-  description = "OVH cloud projektets service ID"
+  description = "OVH Cloud project service ID"
 }
 
 variable "container_registry" {
@@ -10,8 +8,6 @@ variable "container_registry" {
     deploy = bool
     name   = string
     region = string
-    plan   = optional(string, "S")
-    size   = optional(number, 209715200 )     # 200 MB in Bytes (200*1024*1024) (209715200 Bytes)
   })
   description = "Configuration of OVH Container Registry"
 }
@@ -22,13 +18,7 @@ variable "registry_users" {
     email = string
   }))
   description = "List of user accounts to create in the container registry"
-  
-  default = [
-    {
-      login = "netic-registry-user"
-      email = "infra-automation@netic.dk"
-    }
-  ]
+  default     = []
 }
 
 variable "ip_restrictions" {

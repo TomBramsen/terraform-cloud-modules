@@ -25,6 +25,6 @@ resource "ovh_cloud_project_network_private_subnet" "subnet" {
   end   = cidrhost(each.value.subnet, each.value.ip_allocation_stop) 
 
   dhcp       = each.value.dhcp
-  no_gateway = false
+  no_gateway = var.no_gateway
 
 }

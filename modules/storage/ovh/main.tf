@@ -19,13 +19,13 @@ resource "ovh_cloud_project_storage" "storage" {
     status = var.object_storage.versioning
   }
 
-  object_lock = {
-    status = var.object_storage.object_lock_days > 0 ? "enabled" : "disabled"
+  object_lock = var.object_storage.object_lock_days > 0 ? {
+    status = "enabled"
     rule = {
       mode   = "governance"
       period = "P${var.object_storage.object_lock_days}D"
     }
-  }
+  } : null
 }
 
 # -----------------------------------------------------------------------------

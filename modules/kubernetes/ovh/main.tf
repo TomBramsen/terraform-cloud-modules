@@ -13,7 +13,7 @@ resource "ovh_cloud_project_kube_nodepool" "node_pool" {
   service_name  = var.ovh_project_id
   kube_id       = ovh_cloud_project_kube.kube_cluster.id
   
-  # each.key is the name of the pool (fx "frontend" eller "backend")
+  # each.key is the pool name (e.g. "frontend" or "backend")
   name          = each.key
   flavor_name   = each.value.size
   desired_nodes = each.value.nodes_count

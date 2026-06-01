@@ -1,6 +1,6 @@
 locals {
-  is_windows      = can(regex("(?i)windows", var.vm.image_name))
-  create_ssh_key  = var.vm.sshkey == null && !local.is_windows
+  is_windows     = can(regex("(?i)windows", var.vm.image_name))
+  create_ssh_key = var.vm.sshkey == null && !local.is_windows
 }
 
 ######################################
@@ -16,43 +16,15 @@ resource "tls_private_key" "ssh_key" {
 resource "openstack_compute_keypair_v2" "default" {
   count      = local.create_ssh_key ? 1 : 0
   name       = "${var.vm.name}-generated-key"
-  public_key =  trimspace(tls_private_key.ssh_key[0].public_key_openssh)
+  public_key = trimspace(tls_private_key.ssh_key[0].public_key_openssh)
 }
 
 resource "ovh_cloud_project_ssh_key" "default" {
   count        = local.create_ssh_key ? 1 : 0
-  service_name = var.ovh_project_id  
+  service_name = var.ovh_project_id
   name         = "${var.vm.name}-generated-key"
   public_key   = trimspace(tls_private_key.ssh_key[0].public_key_openssh)
 }
-
-
-######################################
-###    Eksplicitte Netkort         ###
-######################################
-/*
-# Trækker IDs ud på de netværksnavne, der sendes med ind
-data "openstack_networking_network_v2" "selected_nets" {
-  for_each = toset(var.vm.network_names)
-  name     = each.value
-}
-
-# Opretter et rigtigt netkort (NIC / Port) til hvert netværk
-resource "openstack_networking_port_v2" "vm_ports" {
-  for_each       = toset(var.vm.network_names)
-  name           = "${var.vm.name}-${each.value}-nic"
-  network_id     = data.openstack_networking_network_v2.selected_nets[each.value].id
-  admin_state_up = true
-
-  # IP Forwarding / Allowed Address Pairs slås KUN til, hvis der er sendt noget med i listen
-  dynamic "allowed_address_pairs" {
-    for_each = var.vm.allowed_address_pairs
-    content {
-      ip_address = allowed_address_pairs.value
-    }
-  }
-}
-*/
 
 
 ######################################
@@ -69,13 +41,7 @@ resource "openstack_compute_instance_v2" "VMLinux" {
   security_groups = ["default"]
   power_state     = var.vm.power_state
   user_data       = var.vm.user_data
-  
-  /* dynamic "network" {
-    for_each = resource.openstack_networking_port_v2.vm_ports
-    content {
-      port = network.value.id
-    }
-  }*/
+
   dynamic "network" {
     for_each = var.vm.network_names
     content {
@@ -85,8 +51,13 @@ resource "openstack_compute_instance_v2" "VMLinux" {
 
   lifecycle {
     ignore_changes = [image_name]
+    precondition {
+      condition     = !local.is_windows || var.vm.admin_pass != null
+      error_message = "admin_pass must be set for Windows VMs."
+    }
   }
-  depends_on = [ ovh_cloud_project_ssh_key.default ]
+
+  depends_on = [ovh_cloud_project_ssh_key.default]
 }
 
 # Windows VM
@@ -98,7 +69,7 @@ resource "openstack_compute_instance_v2" "VMWindows" {
   admin_pass      = var.vm.admin_pass
   security_groups = ["default"]
   power_state     = var.vm.power_state
-  
+
   dynamic "network" {
     for_each = var.vm.network_names
     content {
@@ -108,6 +79,9 @@ resource "openstack_compute_instance_v2" "VMWindows" {
 
   lifecycle {
     ignore_changes = [image_name]
+    precondition {
+      condition     = var.vm.admin_pass != null
+      error_message = "admin_pass must be set for Windows VMs."
+    }
   }
 }
-
