@@ -1,9 +1,11 @@
-variable "aks_cluster_rg" {
-  type = string
+variable "netic_username" {
+  type      = string
+  sensitive = true
 }
 
-variable "aks_cluster_name" {
-  type = string
+variable "netic_password" {
+  type      = string
+  sensitive = true
 }
 
 variable "cluster_simple_name" {

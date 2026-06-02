@@ -28,20 +28,6 @@ variable "node_config" {
   description = "Unified sizing, scaling, labeling, and taint configurations for the default node pool"
 }
 
-variable "flux_config" {
-  type = object({
-    cluster_repo   = string
-    bootstrap_path = string
-    git_auth = map(object({
-      username = optional(string, "")
-      password = optional(string, "")
-      identity = optional(string, "")
-    }))
-  })
-  default     = null
-  description = "Optional Flux/GitOps bootstrap config. If null, no bootstrap is run. Works for both Azure and OVH via kubeconfig."
-}
-
 variable "cloud_settings" {
   type = object({
     cloud_provider     = string # "azure" or "ovh"

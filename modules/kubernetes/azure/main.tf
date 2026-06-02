@@ -11,7 +11,7 @@ default_node_pool {
     vm_size              = var.node_config.sku
     node_count           = var.node_config.node_count
     vnet_subnet_id       = var.cloud_settings.vnet_subnet_id
-    node_labels          = merge({ "environment" = var.cluster_config.environment }, var.node_config.labels)
+    node_labels          = merge(var.cluster_config.tags, var.node_config.labels)
     
     # Mapping the shared autoscale and zones properties to Azure parameters
     auto_scaling_enabled = var.node_config.autoscale_enabled
@@ -38,8 +38,5 @@ default_node_pool {
     }
   }
 
-  tags = {
-    managed-by  = "terraform"
-    environment = var.cluster_config.environment
-  }
+  tags = merge({ managed-by = "terraform" }, var.cluster_config.tags)
 }

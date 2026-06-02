@@ -34,8 +34,8 @@ terraform {
 
 provider "azurerm" {
   features {}
-  subscription_id = var.subscription_id
-   resource_provider_registrations = "none"
+  subscription_id              = var.cloud_settings.cloud_provider == "azure" ? var.cloud_settings.azure.subscription_id : ""
+  resource_provider_registrations = "none"
 }
 /*
 provider "openstack" {

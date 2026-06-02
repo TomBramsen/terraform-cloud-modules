@@ -5,6 +5,10 @@ resource "ovh_cloud_project_kube" "kube_cluster" {
   region             = var.cloud_settings.ovh_region
   version            = var.cluster_config.version
   private_network_id = var.cloud_settings.private_network_id
+
+  timeouts {
+    create = "45m"
+  }
 }
 
 # Create Managed Node Pool
@@ -32,7 +36,7 @@ resource "ovh_cloud_project_kube_nodepool" "node_pool" {
       }
       finalizers = []
       
-      labels = merge({ "environment" = var.cluster_config.environment }, var.node_config.labels)
+      labels = merge(var.cluster_config.tags, var.node_config.labels)
     }
     
     spec {
@@ -48,4 +52,8 @@ resource "ovh_cloud_project_kube_iprestrictions" "restrictions" {
   service_name = var.cloud_settings.ovh_project_id
   kube_id      = ovh_cloud_project_kube.kube_cluster.id
   ips          = var.cloud_settings.ip_restrictions
+
+  # Must be destroyed before the node pool — OVH API rejects ipRestriction updates
+  # while a node pool is in DELETING status.
+  depends_on = [ovh_cloud_project_kube_nodepool.node_pool]
 }

@@ -9,9 +9,11 @@ output "cluster_id" {
 }
 
 output "kubeconfig" {
-  description = "The raw kubeconfig configuration file"
-  value       = one(concat(module.azure_k8s_cluster[*].kubeconfig, module.ovh_k8s_cluster[*].kubeconfig))
-  sensitive   = true
+  value = one(concat(
+    module.azure_k8s_cluster[*].kubeconfig,
+    module.ovh_k8s_cluster[*].kubeconfig
+  ))
+  sensitive = true
 }
 
 output "cluster_identity_id" {

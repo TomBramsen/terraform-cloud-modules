@@ -76,7 +76,17 @@ provider "ovh" {
 }
 ```
 
+## Architecture
+
+OVHcloud private networks are **multi-region resources** with a unique design:
+- One private vRack network spans all specified regions
+- One subnet per region (not multiple subnets per region)
+- Each subnet has independent DHCP and IP allocation settings
+
+This differs fundamentally from Azure, where a VNet exists in a single region but can contain multiple subnets within that region. OVH's architecture prioritizes network continuity across regions over subnet flexibility within a region.
+
 ## Notes
 
 - OVHcloud allows only one network per VLAN ID within a vRack. Reusing a `vlan_id` across multiple module calls will cause a conflict.
 - The network name is passed to VMs via `network_names` in the `vm` module — make sure they match.
+- One subnet per region is a platform constraint; you cannot create multiple subnets in the same region using this module.

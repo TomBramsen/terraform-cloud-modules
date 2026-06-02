@@ -12,3 +12,11 @@ output "storage_region" {
   description = "Region of the created storage resource"
   value       = var.deployment_type == "object" ? var.object_storage.region : var.block_storage.region
 }
+
+output "connection_string" {
+  description = "Connection string for the storage (null for OVH - use S3 endpoint instead)"
+  value       = null
+  sensitive   = true
+}
+
+

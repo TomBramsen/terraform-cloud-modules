@@ -48,8 +48,19 @@ output "subnet_ids" { value = module.network.subnet_ids }
 | `network_name` | Name of the VNet |
 | `subnet_ids` | Map of subnet names → IDs — use to pass `subnet_id` to the VM module |
 
+## Architecture
+
+Azure VNets are **single-region resources**. This module provisions:
+- One VNet in the specified region
+- Multiple named subnets within that region (no regional separation)
+
+This differs fundamentally from OVHcloud, which supports a single private network spanning multiple regions with one subnet per region.
+
+To deploy across Azure regions, use separate module calls per region or implement VNet peering between regions (not included in this module).
+
 ## Notes
 
 - Subnet names must be unique within the VNet.
 - The `aks` subnet, if used with AKS, should have at least a `/22` prefix to allow enough IPs for node and pod scaling.
 - Use `subnet_ids["default"]` to reference a specific subnet ID in other modules.
+- Each VNet is isolated to a single region — multi-region deployments require additional peering configuration outside this module.

@@ -10,6 +10,8 @@ resource "null_resource" "gitops_seed" {
   provisioner "local-exec" {
     command = "${path.module}/scripts/gitops-seed.sh ${var.cluster_repo}"
     environment = {
+      netic_username                    = var.netic_username
+      netic_password                    = var.netic_password
       cluster_simple_name               = var.cluster_simple_name
       region                            = var.region
       environment                       = var.environment

@@ -12,9 +12,14 @@ variable "network_name" {
   description = "Name of the network (used on both clouds)"
 }
 
+variable "project_id" {
+  type        = string
+  description = "Project ID for the cloud provider"
+  default     = null
+}
+
 variable "ovh_config" {
   type = object({
-    project_id = string
     vlan_id    = number
     no_gateway = optional(bool, false)
     regions = list(object({

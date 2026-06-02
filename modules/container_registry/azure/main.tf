@@ -7,7 +7,7 @@ resource "azurerm_container_registry" "registry" {
   admin_enabled       = true
 
   dynamic "network_rule_set" {
-    for_each = length(var.ip_restrictions) > 0 ? [1] : []
+    for_each = var.container_registry.sku == "Premium" && length(var.ip_restrictions) > 0 ? [1] : []
     content {
       default_action = "Deny"
       dynamic "ip_rule" {

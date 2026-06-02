@@ -3,6 +3,7 @@ variable "cluster_config" {
     name        = string
     environment = string
     version     = string
+    tags        = optional(map(string), {})
   })
   description = "Core Kubernetes cluster settings"
 }

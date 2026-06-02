@@ -1,45 +1,35 @@
 #!/usr/bin/env bash
 
-set -e
+set -eo pipefail
 
-# Use the kubeconfig file written by Terraform — works for any cloud provider.
-export KUBECONFIG="${kubeconfig_file}"
+# 1. Skriv den dynamiske kubeconfig til en midlertidig fil på maskinen/runneren
+export KUBECONFIG="$(pwd)/kvm-kubeconfig.tmp"
+echo "$KUBECONFIG_RAW" > "$KUBECONFIG"
+chmod 600 "$KUBECONFIG"
+
+# Sørg for at rydde kubeconfig-filen op når scriptet afsluttes (uanset om det fejler eller lykkes)
+checkout_gotk="$(pwd)/gotk-bootstrap-k8s"
+checkout_config="$(pwd)/kubernetes-config"
+trap 'rm -f "$KUBECONFIG"; rm -rf "$checkout_gotk" "$checkout_config"' EXIT
 
 gitops_username=$(echo "${netic_username}" | jq -Rr @uri)
 gitops_token=$(echo "${netic_password}" | jq -Rr @uri)
 
 # --- Apply Flux / gotk components ---
-checkout="$(pwd)/gotk-bootstrap-k8s"
-git clone --depth 1 "https://${gitops_username}:${gitops_token}@git.netic.dk/scm/pd/gotk-bootstrap-k8s.git" "${checkout}"
-pushd "${checkout}/gotk"
-kubectl apply -f gotk-components.yaml
+git clone --depth 1 "https://${gitops_username}:${gitops_token}@git.netic.dk/scm/pd/gotk-bootstrap-k8s.git" "${checkout_gotk}"
+pushd "${checkout_gotk}/gotk"
+{
+  echo "=== GOTK DEBUG $(date) ==="
+  echo "perl test: $(echo '${foo:=bar}' | perl -pe 's/\$\{(\w+)(?::=([^}]*))?\}/$ENV{$1} \/\/ $2 \/\/ ""/ge')"
+  perl -pe 's/\$\{(\w+)(?::=([^}]*))?\}/$ENV{$1} \/\/ $2 \/\/ ""/ge' gotk-components.yaml > /tmp/gotk-substituted.yaml
+  echo "memory linje: $(grep 'source_controller_mem\|memory:' /tmp/gotk-substituted.yaml | head -3)"
+} > /tmp/gotk-debug.log 2>&1
+kubectl apply --server-side --force-conflicts -f /tmp/gotk-substituted.yaml
 popd
-rm -rf "${checkout}"
 
 # --- Bootstrap the cluster GitOps repo ---
-gh_url="$1"
+git clone --depth 1 "https://${gitops_username}:${gitops_token}@$1" "${checkout_config}"
 
-if [ -n "${kubernetes_config_key}" ]; then
-  echo "${kubernetes_config_key}" > ~/.ssh/id_ed25519_gitopsrepo
-  cp ~/.ssh/config ~/.ssh/config.save
-  cat <<EOF >> ~/.ssh/config
-Host gitopsrepo
-   HostName github.com
-   IdentityFile ~/.ssh/id_ed25519_gitopsrepo
-   User git
-EOF
-  chmod 600 ~/.ssh/*
-  gh_url="${1/github.com/gitopsrepo}"
-fi
-
-checkout="$(pwd)/kubernetes-config"
-git clone --depth 1 "${gh_url}" "${checkout}"
-
-pushd "${checkout}/$2"
-kubectl apply -k .
+pushd "${checkout_config}/$2"
+kubectl kustomize . | perl -pe 's/\$\{(\w+)(?::=([^}]*))?\}/$ENV{$1} \/\/ $2 \/\/ ""/ge' | kubectl apply --server-side --force-conflicts -f -
 popd
-rm -rf "${checkout}"
-
-if [ -n "${kubernetes_config_key}" ]; then
-  mv ~/.ssh/config.save ~/.ssh/config
-fi

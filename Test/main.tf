@@ -1,53 +1,63 @@
 
 # =============================================================================
-# Network — VNet with two subnets:
+# Network — cloud-agnostisk, styret af cloud_settings.cloud_provider
 # =============================================================================
-
 module "network" {
   source         = "../modules/network/wrapper"
-  cloud_provider = "azure"
-  network_name   = "${var.prefix}-vnet"
+  cloud_provider = var.cloud_settings.cloud_provider
+  network_name   = "${var.prefix}-network"
+  project_id     = var.cloud_settings.cloud_provider == "ovh" ? var.cloud_settings.ovh.project_id : ""
 
-  azure_config = {
-    location       = var.location
-    resource_group = var.resource_group_name
-    address_space  = ["10.0.12.0/22"]
-    subnets = {
-      aks     = { cidr = "10.0.12.0/24" }
-      default = { cidr = "10.0.13.0/24" }
-    }
-  }
+  azure_config = var.cloud_settings.cloud_provider == "azure" ? {
+    location       = var.cloud_settings.region
+    resource_group = var.cloud_settings.azure.resource_group
+    address_space  = try(var.network_config.azure.address_space, [])
+    subnets        = try(var.network_config.azure.subnets, {})
+  } : null
+
+  ovh_config = var.cloud_settings.cloud_provider == "ovh" ? var.network_config.ovh : null
 }
 
-# =============================================================================
-# Container Registry — Azure ACR (Standard)
-# =============================================================================
 
+# =============================================================================
+# Container Registry
+# =============================================================================
 module "registry" {
   source         = "../modules/container_registry/wrapper"
-  cloud_provider = "azure"
+  cloud_provider = var.cloud_settings.cloud_provider
 
   container_registry = {
-    deploy = true
-    name   = var.registry_name
+    deploy = var.registry_config.deploy
+    name   = var.registry_config.name
   }
 
-  azure_config = {
-    location       = var.location
-    resource_group = var.resource_group_name
-    sku            = "Standard"
-  }
+  azure_config = var.cloud_settings.cloud_provider == "azure" ? {
+    location       = var.cloud_settings.region
+    resource_group = var.cloud_settings.azure.resource_group
+    sku            = try(var.registry_config.azure.sku, "Standard")
+  } : null
 
-  registry_users = [
+  ovh_config = var.cloud_settings.cloud_provider == "ovh" ? {
+    project_id = var.cloud_settings.ovh.project_id
+    region     = var.registry_config.ovh.region
+  } : null
+
+  registry_users  = [
     { login = "ci-user", email = var.registry_user_email }
+  ]
+  ip_restrictions = [
+    for ip in var.cloud_settings.ip_restrictions : {
+      ip_block    = ip
+      description = "Allowed IP"
+    }
   ]
 }
 
+
+
+
 # =============================================================================
-# Kubernetes 
-# =============================================================================
-# =============================================================================
-# Kubernetes Cluster Integration Layer
+# Kubernetes Cluster
 # =============================================================================
 module "kubernetes" {
   source = "../modules/kubernetes/wrapper"
@@ -56,17 +66,15 @@ module "kubernetes" {
     cluster_name = var.cluster_config.cluster_name
     environment  = var.cluster_config.environment
     version      = var.kubernetes_version
-    tags         = var.cluster_config.tags
+    tags         = merge(var.tags, var.cluster_config.tags)
   }
 
   node_config = {
-    node_size         = local.resolved_node_sku
-    node_count        = var.node_config.node_count
-    autoscale_enabled = var.node_config.autoscale_enabled
-
-    min_count = var.node_config.min_count
-    max_count = var.node_config.max_count
-
+    node_size          = local.resolved_node_sku
+    node_count         = var.node_config.node_count
+    autoscale_enabled  = var.node_config.autoscale_enabled
+    min_count          = var.node_config.min_count
+    max_count          = var.node_config.max_count
     availability_zones = var.node_config.availability_zones
     labels             = var.node_config.labels
     taints             = var.node_config.taints
@@ -75,51 +83,42 @@ module "kubernetes" {
   cloud_settings = {
     cloud_provider     = var.cloud_settings.cloud_provider
     region             = var.cloud_settings.region
-    project_identifier = var.cloud_settings.project_identifier
-    # Dynamically provide the subnet ID if Azure is running
-    network_id      = var.cloud_settings.cloud_provider == "azure" ? module.network.subnet_ids["aks"] : var.cloud_settings.network_id
-    dns_prefix      = coalesce(var.cloud_settings.azure_dns_prefix, var.cluster_config.cluster_name)
-    ip_restrictions = var.cloud_settings.ip_restrictions
+    project_identifier = var.cloud_settings.cloud_provider == "azure" ? var.cloud_settings.azure.resource_group : var.cloud_settings.ovh.project_id
+    network_id         = var.cloud_settings.cloud_provider == "azure" ? module.network.subnet_ids["aks"] : var.cloud_settings.network_id
+    dns_prefix         = coalesce(try(var.cloud_settings.azure.dns_prefix, null), var.cluster_config.cluster_name)
+    ip_restrictions    = var.cloud_settings.ip_restrictions
   }
-
-  flux_config = local.flux_config
 }
 
 # =============================================================================
 # GitOps / Flux Bootstrap
 # =============================================================================
-# flux_config er optional i wrapperen — fjern hele blokken hvis du ikke vil bootstrappe.
-# Credentials trækkes fra miljøvariabler:
-#   export TF_VAR_netic_git_username="..."
-#   export TF_VAR_netic_git_token="..."
-#   export TF_VAR_gitops_ssh_key="$(cat ~/.ssh/id_ed25519_gitops)"
-# =============================================================================
+module "flux_bootstrap" {
+  source = "../modules/kubernetes/bootstrap/gitops"
 
-locals {
-  flux_config = {
-    cluster_repo   = "git@github.com:your-org/kubernetes-config.git" # <-- din cluster config repo (ikke gotk-repoet)
-    bootstrap_path = "clusters/${var.cluster_config.environment}"
+  kubeconfig     = module.kubernetes.kubeconfig
 
-    git_auth = {
-      netic = {
-        username = var.netic_git_username
-        password = var.netic_git_token
-      }
-      "kubernetes-config" = {
-        identity = var.gitops_ssh_key
-      }
+  cluster_repo   = "git.netic.dk/scm/pd/gotk-bootstrap-k8s.git"
+  bootstrap_path = "gotk"
+
+  git_auth = {
+    netic = {
+      username = var.netic_git_username
+      password = var.netic_git_token
+    }
+    "kubernetes-config" = {
+      identity = var.gitops_ssh_key
     }
   }
 }
 
 # =============================================================================
-# Role Assignments (Executed ONLY if provider is Azure)
+# Role Assignments (kun Azure)
 # =============================================================================
-# Grant AKS's managed identity Network Contributor on the AKS subnet
-# so it can manage load balancers and route tables safely.
 resource "azurerm_role_assignment" "aks_network" {
   count                = var.cloud_settings.cloud_provider == "azure" ? 1 : 0
   scope                = module.network.subnet_ids["aks"]
   role_definition_name = "Network Contributor"
   principal_id         = module.kubernetes.cluster_identity_id
 }
+

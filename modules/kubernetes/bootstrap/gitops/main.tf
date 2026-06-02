@@ -70,19 +70,18 @@ resource "local_file" "netic_git_auth" {
   depends_on = [null_resource.wait_for_workers]
 }
 
-# Bootstrap Flux / GitOps components onto the cluster.
 resource "null_resource" "gitops_bootstrap" {
   provisioner "local-exec" {
     command     = "${path.module}/scripts/gitops-bootstrap.sh ${var.cluster_repo} ${var.bootstrap_path}"
     working_dir = path.cwd
 
     environment = {
-      kubeconfig_file       = local_sensitive_file.kubeconfig.filename
+      # Vi dumper rå-stringen direkte ind i miljøvariablen her
+      KUBECONFIG_RAW        = var.kubeconfig
       netic_username        = var.git_auth["netic"].username
       netic_password        = var.git_auth["netic"].password
       kubernetes_config_key = try(var.git_auth["kubernetes-config"].identity, "")
     }
   }
-
   depends_on = [null_resource.wait_for_workers]
 }

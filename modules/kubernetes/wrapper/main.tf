@@ -39,6 +39,7 @@ module "ovh_k8s_cluster" {
     name        = var.cluster_config.cluster_name
     environment = var.cluster_config.environment
     version     = var.cluster_config.k8s_version
+    tags        = var.cluster_config.tags
   }
 
   node_config = {
@@ -59,26 +60,4 @@ module "ovh_k8s_cluster" {
     private_network_id = var.cloud_settings.network_id
     ip_restrictions    = var.cloud_settings.ip_restrictions
   }
-}
-
-
-
-
-# --- OPTIONAL FLUX / GITOPS BOOTSTRAP ---
-# Runs after whichever cloud cluster was provisioned.
-# Uses kubeconfig directly, so it works identically for Azure and OVH.
-module "flux_bootstrap" {
-  source = "../bootstrap/gitops"
-  count  = var.flux_config != null ? 1 : 0
-
-  kubeconfig = one(concat(
-    module.azure_k8s_cluster[*].kubeconfig,
-    module.ovh_k8s_cluster[*].kubeconfig
-  ))
-
-  cluster_repo   = var.flux_config.cluster_repo
-  bootstrap_path = var.flux_config.bootstrap_path
-  git_auth       = var.flux_config.git_auth
-
-  depends_on = [module.azure_k8s_cluster, module.ovh_k8s_cluster]
 }

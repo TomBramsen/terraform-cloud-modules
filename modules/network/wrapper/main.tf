@@ -2,7 +2,7 @@ module "ovh" {
   count  = var.cloud_provider == "ovh" ? 1 : 0
   source = "../ovh"
 
-  ovh_project_id = try(var.ovh_config.project_id, "")
+  ovh_project_id = try(var.project_id, "")
   network_name   = var.network_name
   vlan_id        = try(var.ovh_config.vlan_id, 0)
   no_gateway     = try(var.ovh_config.no_gateway, false)

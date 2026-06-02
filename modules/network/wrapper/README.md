@@ -2,7 +2,22 @@
 
 Provisions a private network on either **OVHcloud** (vRack) or **Azure** (VNet) using a shared entry point.
 
-The network architectures differ between clouds — OVH uses VLAN-based private networking across regions, Azure uses address-space-based VNets with named subnets — so each cloud has its own config block.
+## Why Different Architectures?
+
+The network architectures differ fundamentally between clouds:
+
+| Aspect | Azure | OVHcloud |
+|--------|-------|----------|
+| **Scope** | Single region | Multiple regions |
+| **Subnets** | Multiple per region | One per region |
+| **Use case** | Segmentation within a region (e.g., app tier, data tier) | Regional distribution (e.g., GRA11, SBG5) |
+
+- **Azure**: One VNet → many subnets in that region. For multi-region, use separate module calls + VNet peering.
+- **OVHcloud**: One network → one subnet per selected region. All regions share the same VLAN.
+
+Choose based on your deployment model:
+- Single region with subnet segmentation? → Azure
+- Multiple regions with simple network structure? → OVHcloud
 
 ## Usage
 
@@ -61,3 +76,4 @@ module "network" {
 | `network_id` | ID of the created network |
 | `network_name` | Name of the network |
 | `subnet_ids` | Map of region/name → subnet ID — use with the VM wrapper's `ovh_config.network_names` or `azure_config.subnet_id` |
+
