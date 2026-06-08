@@ -1,37 +1,47 @@
+locals {
+  is_ovh = var.vm.ovh != null
+}
+
 module "ovh" {
-  count  = var.cloud_provider == "ovh" ? 1 : 0
+  count  = local.is_ovh ? 1 : 0
   source = "../ovh"
 
-  ovh_project_id = try(var.ovh_config.project_id, "")
+  ovh_project_id = var.vm.ovh.project_id
 
   vm = {
-    name          = var.vm.name
-    size          = var.vm.size
-    image_name    = try(var.ovh_config.image_name, "")
-    sshkey        = try(var.ovh_config.sshkey, null)
-    admin_pass    = var.vm.admin_pass
-    network_names = try(var.ovh_config.network_names, [])
-    power_state   = try(var.ovh_config.power_state, "active")
-    user_data     = var.vm.user_data
+    name           = var.vm.name
+    size           = var.vm.size
+    location       = var.vm.location
+    image_name     = var.vm.ovh.image_name
+    os_type        = var.vm.os_type
+    ssh_public_key = var.vm.ssh_public_key
+    admin_pass     = var.vm.admin_pass
+    resource_group   = var.vm.resource_group
+    create_public_ip = var.vm.create_public_ip
+    network_names    = var.vm.ovh.network_names
+    port_ids       = var.vm.ovh.port_ids
+    power_state    = var.vm.ovh.power_state
+    user_data      = var.vm.user_data
+    security_groups = var.vm.ovh.security_groups
   }
 }
 
 module "azure" {
-  count  = var.cloud_provider == "azure" ? 1 : 0
+  count  = local.is_ovh ? 0 : 1
   source = "../azure"
 
   vm = {
     name             = var.vm.name
     size             = var.vm.size
-    location         = try(var.azure_config.location, "")
-    resource_group   = try(var.azure_config.resource_group, "")
-    os_type          = try(var.azure_config.os_type, "Linux")
-    admin_username   = try(var.azure_config.admin_username, "azureuser")
+    location         = var.vm.location
+    resource_group   = var.vm.resource_group
+    os_type          = var.vm.os_type
+    admin_username   = var.vm.azure.admin_username
     admin_pass       = var.vm.admin_pass
-    ssh_public_key   = try(var.azure_config.ssh_public_key, null)
-    subnet_id        = try(var.azure_config.subnet_id, "")
-    create_public_ip = try(var.azure_config.create_public_ip, false)
+    ssh_public_key   = var.vm.ssh_public_key
+    subnet_id        = var.vm.azure.subnet_id
+    create_public_ip = var.vm.create_public_ip
     user_data        = var.vm.user_data
-    image            = try(var.azure_config.image, { publisher = "", offer = "", sku = "", version = "latest" })
+    image            = var.vm.azure.image
   }
 }

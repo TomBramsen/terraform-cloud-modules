@@ -1,5 +1,12 @@
 locals {
   # Map T-shirt sizes to actual cloud VM SKUs / Flavors
+
+  ## download openrc.sh from users
+  ## run with 'source openrc.sh' to set env vars for terraform to use
+  ##  openstack flavor list --sort-column RAM
+  ## more info on flavor 'openstack flavor show d2-4'
+
+  ## or https://www.ovhcloud.com/en/public-cloud/prices/
   node_sku_mapping = {
     azure = {
       small  = "Standard_B2ms"
@@ -7,9 +14,9 @@ locals {
       large  = "Standard_D4s_v5"
     }
     ovh = {
-      small  = "b2-7"
-      medium = "b2-15"
-      large  = "d2-8"
+      small  = "d2-4"
+      medium = "b3-16"
+      large  = "b2-30"
     }
   }
 

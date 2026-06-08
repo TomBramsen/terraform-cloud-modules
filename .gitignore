@@ -48,4 +48,13 @@ terraform.rc
 
 # Optional: ignore plan files saved before destroying Terraform configuration
 # Uncomment the line below if you want to ignore planout files.
-# planout
+# planout¨
+
+.claude
+
+# Test directories (contain state and kubeconfigs)
+Test_K8S_Azure/
+Test_K8s_OVH/
+
+# Bootstrap kubeconfig written by gitops module
+**/.kubeconfig-bootstrap

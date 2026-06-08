@@ -13,6 +13,31 @@ terraform {
   }
 }
 
+locals {
+  git_auth_manifests = {
+    for key, auth in var.git_auth : key => <<-YAML
+      ---
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        labels:
+          name: netic-gitops-system
+        name: netic-gitops-system
+      ---
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: ${key}-git-auth
+        namespace: netic-gitops-system
+      type: Opaque
+      data:
+      %{ for field, value in auth ~}
+        ${field}: ${base64encode(value)}
+      %{ endfor ~}
+    YAML
+  }
+}
+
 # Write kubeconfig to a temp file so kubectl can use it directly.
 # Marked sensitive so Terraform never prints the content in logs.
 resource "local_sensitive_file" "kubeconfig" {
@@ -36,35 +61,19 @@ resource "null_resource" "wait_for_workers" {
 }
 
 # Create the netic-gitops-system namespace + git-auth secrets on the cluster.
-resource "local_file" "netic_git_auth" {
+# Piped via stdin to avoid leaving secret YAML files on disk after apply.
+resource "null_resource" "netic_git_auth" {
   for_each = var.git_auth
 
-  content = <<-EOF
-    ---
-    apiVersion: v1
-    kind: Namespace
-    metadata:
-      labels:
-        name: netic-gitops-system
-      name: netic-gitops-system
-    ---
-    apiVersion: v1
-    kind: Secret
-    metadata:
-      name: ${each.key}-git-auth
-      namespace: netic-gitops-system
-    type: Opaque
-    data:
-    %{ for key, value in each.value ~}
-      ${key}: ${base64encode(value)}
-    %{ endfor ~}
-  EOF
-
-  filename        = "${path.cwd}/${each.key}-git-auth.yaml"
-  file_permission = "0600"
+  triggers = {
+    manifest_hash = sha256(local.git_auth_manifests[each.key])
+  }
 
   provisioner "local-exec" {
-    command = "kubectl --kubeconfig=${local_sensitive_file.kubeconfig.filename} apply -f ${path.cwd}/${each.key}-git-auth.yaml"
+    command     = "printf '%s' \"$MANIFEST\" | kubectl --kubeconfig=${local_sensitive_file.kubeconfig.filename} apply -f -"
+    environment = {
+      MANIFEST = local.git_auth_manifests[each.key]
+    }
   }
 
   depends_on = [null_resource.wait_for_workers]
@@ -76,12 +85,12 @@ resource "null_resource" "gitops_bootstrap" {
     working_dir = path.cwd
 
     environment = {
-      # Vi dumper rå-stringen direkte ind i miljøvariablen her
       KUBECONFIG_RAW        = var.kubeconfig
       netic_username        = var.git_auth["netic"].username
       netic_password        = var.git_auth["netic"].password
       kubernetes_config_key = try(var.git_auth["kubernetes-config"].identity, "")
     }
   }
-  depends_on = [null_resource.wait_for_workers]
+
+  depends_on = [null_resource.wait_for_workers, null_resource.netic_git_auth]
 }

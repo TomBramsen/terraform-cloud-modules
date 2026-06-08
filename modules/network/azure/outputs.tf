@@ -12,3 +12,8 @@ output "subnet_ids" {
   value       = { for k, v in azurerm_subnet.subnet : k => v.id }
   description = "Map of subnet names to their IDs"
 }
+
+output "nsg_ids" {
+  value       = { for k, v in azurerm_network_security_group.nsg : k => v.id }
+  description = "Map of subnet names to their NSG IDs"
+}

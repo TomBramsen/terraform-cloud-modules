@@ -90,6 +90,8 @@ resource "azurerm_windows_virtual_machine" "vm" {
     version   = var.vm.image.version
   }
 
+  custom_data = var.vm.user_data != null ? base64encode(var.vm.user_data) : null
+
   lifecycle {
     ignore_changes = [source_image_reference]
     precondition {

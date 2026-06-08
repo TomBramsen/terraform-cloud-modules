@@ -1,48 +1,33 @@
-variable "cloud_provider" {
-  type        = string
-  description = "Cloud provider: 'ovh' or 'azure'"
+variable "network" {
+  type = object({
+    name = string
+
+    ovh = optional(object({
+      project_id = string
+      vlan_id    = number
+      regions = list(object({
+        region              = string
+        subnet              = string
+        dhcp                = optional(bool, true)
+        no_gateway          = optional(bool, false)
+        ip_allocation_start = optional(number, 10)
+        ip_allocation_stop  = optional(number, 200)
+      }))
+    }), null)
+
+    azure = optional(object({
+      location       = string
+      resource_group = string
+      address_space  = list(string)
+      subnets = map(object({
+        cidr = string
+      }))
+    }), null)
+  })
+  description = "Network configuration. Set exactly one of network.ovh or network.azure."
+
   validation {
-    condition     = contains(["ovh", "azure"], var.cloud_provider)
-    error_message = "cloud_provider must be 'ovh' or 'azure'."
+    condition     = (var.network.ovh != null) != (var.network.azure != null)
+    error_message = "Exactly one of network.ovh or network.azure must be set."
   }
-}
-
-variable "network_name" {
-  type        = string
-  description = "Name of the network (used on both clouds)"
-}
-
-variable "project_id" {
-  type        = string
-  description = "Project ID for the cloud provider"
-  default     = null
-}
-
-variable "ovh_config" {
-  type = object({
-    vlan_id    = number
-    no_gateway = optional(bool, false)
-    regions = list(object({
-      region              = string
-      subnet              = string
-      dhcp                = optional(bool, true)
-      ip_allocation_start = optional(number, 10)
-      ip_allocation_stop  = optional(number, 200)
-    }))
-  })
-  default     = null
-  description = "OVH-specific network config. Required when cloud_provider = 'ovh'."
-}
-
-variable "azure_config" {
-  type = object({
-    location       = string
-    resource_group = string
-    address_space  = list(string)
-    subnets = map(object({
-      cidr = string
-    }))
-  })
-  default     = null
-  description = "Azure-specific network config. Required when cloud_provider = 'azure'."
 }

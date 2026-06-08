@@ -1,6 +1,14 @@
 locals {
-  is_windows     = can(regex("(?i)windows", var.vm.image_name))
-  create_ssh_key = var.vm.sshkey == null && !local.is_windows
+  is_windows     = lower(var.vm.os_type) == "windows"
+  create_ssh_key = var.vm.ssh_public_key == null && !local.is_windows
+
+  # Slå netværk via navn og port-ID sammen til én liste til dynamic-blokken
+  # create_public_ip tilføjer Ext-Net (OVH's public internet network)
+  networks = concat(
+    var.vm.create_public_ip ? [{ name = "Ext-Net", port = null }] : [],
+    [for n in var.vm.network_names : { name = n, port = null }],
+    [for p in var.vm.port_ids : { name = null, port = p }]
+  )
 }
 
 ######################################
@@ -13,17 +21,11 @@ resource "tls_private_key" "ssh_key" {
   rsa_bits  = 4096
 }
 
-resource "openstack_compute_keypair_v2" "default" {
-  count      = local.create_ssh_key ? 1 : 0
-  name       = "${var.vm.name}-generated-key"
-  public_key = trimspace(tls_private_key.ssh_key[0].public_key_openssh)
-}
-
 resource "ovh_cloud_project_ssh_key" "default" {
-  count        = local.create_ssh_key ? 1 : 0
+  count        = local.is_windows ? 0 : 1
   service_name = var.ovh_project_id
-  name         = "${var.vm.name}-generated-key"
-  public_key   = trimspace(tls_private_key.ssh_key[0].public_key_openssh)
+  name         = "${var.vm.name}-key"
+  public_key   = local.create_ssh_key ? trimspace(tls_private_key.ssh_key[0].public_key_openssh) : trimspace(var.vm.ssh_public_key)
 }
 
 
@@ -37,15 +39,18 @@ resource "openstack_compute_instance_v2" "VMLinux" {
   name            = var.vm.name
   flavor_name     = var.vm.size
   image_name      = var.vm.image_name
-  key_pair        = local.create_ssh_key ? ovh_cloud_project_ssh_key.default[0].name : var.vm.sshkey
-  security_groups = ["default"]
+  key_pair        = ovh_cloud_project_ssh_key.default[0].name
+  security_groups = var.vm.security_groups
   power_state     = var.vm.power_state
   user_data       = var.vm.user_data
+  # resource_group bruges som metadata i OVH (svarer til Azure resource group)
+  metadata = { resource_group = var.vm.resource_group }
 
   dynamic "network" {
-    for_each = var.vm.network_names
+    for_each = local.networks
     content {
-      name = network.value
+      name = network.value.name
+      port = network.value.port
     }
   }
 
@@ -71,9 +76,10 @@ resource "openstack_compute_instance_v2" "VMWindows" {
   power_state     = var.vm.power_state
 
   dynamic "network" {
-    for_each = var.vm.network_names
+    for_each = local.networks
     content {
-      name = network.value
+      name = network.value.name
+      port = network.value.port
     }
   }
 

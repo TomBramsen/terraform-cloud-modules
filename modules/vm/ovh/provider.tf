@@ -17,3 +17,7 @@ terraform {
     }
   }
 }
+
+provider "openstack" {
+  region = var.vm.location
+}
