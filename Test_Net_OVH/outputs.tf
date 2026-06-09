@@ -24,12 +24,12 @@ output "vm_private_ip" {
 }
 
 output "vm_public_ip" {
-  description = "Public IP of the VM via Ext-Net (null if public_net = false)"
-  value       = module.vm.public_ip
+  description = "Floating IP address of the VM (null if public_net = false)"
+  value       = one(module.public_ip[*].ip_address)
 }
 
 output "ssh_private_key" {
-  description = "Generated SSH private key — only set when no sshkey was provided"
+  description = "Generated SSH private key — only set when no ssh_public_key was provided"
   value       = module.vm.ssh_private_key
   sensitive   = true
 }

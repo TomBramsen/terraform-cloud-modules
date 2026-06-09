@@ -1,5 +1,5 @@
 output "network_id" {
-  description = "OpenStack UUID of the private network (brugbart i openstack_networking_port_v2 m.fl.)"
+  description = "OpenStack UUID of the private network (useful in openstack_networking_port_v2 etc.)"
   value       = data.openstack_networking_network_v2.net.id
 }
 

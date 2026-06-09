@@ -4,9 +4,8 @@
 
 variable "cluster_config" {
   type = object({
-    name        = string
-    environment = string
-    version     = string
+    name    = string
+    version = string
     tags        = optional(map(string), {})
   })
   description = "Core Kubernetes cluster settings"

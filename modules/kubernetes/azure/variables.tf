@@ -1,8 +1,7 @@
 variable "cluster_config" {
   type = object({
-    name        = string
-    environment = string
-    version     = string
+    name    = string
+    version = string
     tags        = optional(map(string), {})
   })
   description = "Core Kubernetes cluster settings"
@@ -16,7 +15,7 @@ variable "node_config" {
     min_count          = optional(number, null)
     max_count          = optional(number, null)
     availability_zones = optional(list(string), [])
-    k8s_version        = optional(string, null) # orchestrator_version på node pool; null = samme som cluster
+    k8s_version        = optional(string, null) # orchestrator_version on the node pool; null = inherits from cluster
     labels             = optional(map(string), {})
     taints             = optional(list(any), [])
   })

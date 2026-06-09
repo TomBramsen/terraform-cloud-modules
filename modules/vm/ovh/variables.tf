@@ -19,6 +19,7 @@ variable "vm" {
     power_state     = optional(string, "active")
     user_data       = optional(string, null)
     security_groups = optional(list(string), ["default"])
+    tags            = optional(map(string), {})
   })
 
   validation {

@@ -3,10 +3,9 @@ module "azure_k8s_cluster" {
   count  = var.cloud_settings.cloud_provider == "azure" ? 1 : 0
 
   cluster_config = {
-    name        = var.cluster_config.cluster_name
-    environment = var.cluster_config.environment
-    version     = var.cluster_config.k8s_version
-    tags        = var.cluster_config.tags
+    name    = var.cluster_config.cluster_name
+    version = var.cluster_config.k8s_version
+    tags    = var.cluster_config.tags
   }
 
   node_config = {
@@ -37,10 +36,9 @@ module "ovh_k8s_cluster" {
   count  = var.cloud_settings.cloud_provider == "ovh" ? 1 : 0
 
   cluster_config = {
-    name        = var.cluster_config.cluster_name
-    environment = var.cluster_config.environment
-    version     = var.cluster_config.k8s_version
-    tags        = var.cluster_config.tags
+    name    = var.cluster_config.cluster_name
+    version = var.cluster_config.k8s_version
+    tags    = var.cluster_config.tags
   }
 
   node_config = {

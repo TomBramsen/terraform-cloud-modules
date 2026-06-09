@@ -2,8 +2,8 @@ locals {
   is_windows     = lower(var.vm.os_type) == "windows"
   create_ssh_key = var.vm.ssh_public_key == null && !local.is_windows
 
-  # Slå netværk via navn og port-ID sammen til én liste til dynamic-blokken
-  # create_public_ip tilføjer Ext-Net (OVH's public internet network)
+  # Combine networks by name and port-ID into a single list for the dynamic block.
+  # create_public_ip prepends Ext-Net (OVH's public internet network)
   networks = concat(
     var.vm.create_public_ip ? [{ name = "Ext-Net", port = null }] : [],
     [for n in var.vm.network_names : { name = n, port = null }],
@@ -28,6 +28,14 @@ resource "ovh_cloud_project_ssh_key" "default" {
   public_key   = local.create_ssh_key ? trimspace(tls_private_key.ssh_key[0].public_key_openssh) : trimspace(var.vm.ssh_public_key)
 }
 
+# openstack_compute_keypair_v2 is required so the compute API can find the key
+# (region-scoped). ovh_cloud_project_ssh_key is only visible in the OVH management plane.
+resource "openstack_compute_keypair_v2" "default" {
+  count      = local.is_windows ? 0 : 1
+  name       = "${var.vm.name}-key"
+  public_key = local.create_ssh_key ? trimspace(tls_private_key.ssh_key[0].public_key_openssh) : trimspace(var.vm.ssh_public_key)
+}
+
 
 ######################################
 ###          Generate VMs          ###
@@ -39,12 +47,11 @@ resource "openstack_compute_instance_v2" "VMLinux" {
   name            = var.vm.name
   flavor_name     = var.vm.size
   image_name      = var.vm.image_name
-  key_pair        = ovh_cloud_project_ssh_key.default[0].name
+  key_pair        = openstack_compute_keypair_v2.default[0].name
   security_groups = var.vm.security_groups
   power_state     = var.vm.power_state
   user_data       = var.vm.user_data
-  # resource_group bruges som metadata i OVH (svarer til Azure resource group)
-  metadata = { resource_group = var.vm.resource_group }
+  metadata = merge(var.vm.tags, { resource_group = var.vm.resource_group })
 
   dynamic "network" {
     for_each = local.networks
@@ -62,7 +69,7 @@ resource "openstack_compute_instance_v2" "VMLinux" {
     }
   }
 
-  depends_on = [ovh_cloud_project_ssh_key.default]
+  depends_on = [openstack_compute_keypair_v2.default]
 }
 
 # Windows VM
@@ -72,8 +79,9 @@ resource "openstack_compute_instance_v2" "VMWindows" {
   flavor_name     = var.vm.size
   image_name      = var.vm.image_name
   admin_pass      = var.vm.admin_pass
-  security_groups = ["default"]
+  security_groups = var.vm.security_groups
   power_state     = var.vm.power_state
+  metadata = merge(var.vm.tags, { resource_group = var.vm.resource_group })
 
   dynamic "network" {
     for_each = local.networks

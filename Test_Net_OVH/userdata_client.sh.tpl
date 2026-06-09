@@ -5,10 +5,17 @@
 
 echo "ubuntu:Kodeord1" | chpasswd
 
-# Tilføj rute til Azure subnet via VPN VM's private IP (med det samme)
+mkdir -p /etc/systemd/resolved.conf.d
+cat > /etc/systemd/resolved.conf.d/dns.conf << EOF
+[Resolve]
+DNS=${dns_servers}
+EOF
+systemctl restart systemd-resolved
+
+# Add route to Azure subnet via VPN VM's private IP (immediately)
 ip route replace ${azure_subnet} via ${vpn_private_ip}
 
-# Gør ruten persistent på tværs af reboots via systemd
+# Make the route persistent across reboots via systemd
 cat > /etc/systemd/system/azure-route.service << 'EOF'
 [Unit]
 Description=Static route to Azure via VPN VM

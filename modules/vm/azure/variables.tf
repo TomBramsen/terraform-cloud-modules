@@ -11,6 +11,7 @@ variable "vm" {
     subnet_id        = string
     create_public_ip = optional(bool, false)
     user_data        = optional(string, null)
+    tags             = optional(map(string), {})
     image = object({
       publisher = string
       offer     = string

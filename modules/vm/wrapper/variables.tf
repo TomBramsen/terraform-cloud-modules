@@ -29,6 +29,8 @@ variable "vm" {
         version   = optional(string, "latest")
       })
     }), null)
+
+    tags = optional(map(string), {})
   })
   description = "VM configuration. Set exactly one of vm.ovh or vm.azure for the target provider."
 

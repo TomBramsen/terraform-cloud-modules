@@ -1,8 +1,7 @@
 variable "cluster_config" {
   type = object({
     cluster_name = string
-    environment  = string
-    k8s_version = optional(string, "1.34") # Kubernetes major.minor version (e.g., "1.34")
+    k8s_version  = optional(string, "1.34") # Kubernetes major.minor version (e.g., "1.34")
     tags         = optional(map(string), {}) # Shared infrastructure resource tags
   })
   description = "General cluster metadata and tagging"

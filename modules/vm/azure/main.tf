@@ -16,7 +16,7 @@ resource "azurerm_public_ip" "public_ip" {
   resource_group_name = var.vm.resource_group
   allocation_method   = "Static"
   sku                 = "Standard"
-  tags                = { managed-by = "terraform" }
+  tags                = var.vm.tags
 }
 
 resource "azurerm_network_interface" "nic" {
@@ -40,6 +40,7 @@ resource "azurerm_linux_virtual_machine" "vm" {
   size                = var.vm.size
   admin_username      = var.vm.admin_username
 
+  tags                  = var.vm.tags
   network_interface_ids = [azurerm_network_interface.nic.id]
 
   admin_ssh_key {
@@ -75,6 +76,7 @@ resource "azurerm_windows_virtual_machine" "vm" {
   size                = var.vm.size
   admin_username      = var.vm.admin_username
   admin_password      = var.vm.admin_pass
+  tags                = var.vm.tags
 
   network_interface_ids = [azurerm_network_interface.nic.id]
 

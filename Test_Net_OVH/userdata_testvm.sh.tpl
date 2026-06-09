@@ -6,13 +6,20 @@ azure_subnet="${azure_subnet}"
 azure_ip="${azure_ip}"
 azure_psk="${azure_psk}"
 
+mkdir -p /etc/systemd/resolved.conf.d
+cat > /etc/systemd/resolved.conf.d/dns.conf << EOF
+[Resolve]
+DNS=${dns_servers}
+EOF
+systemctl restart systemd-resolved
+
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y strongswan strongswan-pki
 
-# OVH GRA9 tildeler public IP direkte på interfacet (ikke floating IP / NAT)
-# Derfor bruges PUBLIC_IP både som left og leftid
-PUBLIC_IP=$(curl -s https://4.icanhazip.com)
+# The floating IP is NAT'd by OVH infrastructure — the VM interface only has the
+# private IP. curl returns the floating IP that Azure sees us from.
+FLOATING_IP=$(curl -s https://4.icanhazip.com)
 
 echo "net.ipv4.ip_forward = 1" >> /etc/sysctl.conf
 sysctl -p
@@ -28,17 +35,19 @@ conn azure-s2s
     type=tunnel
     keyexchange=ikev2
 
-    # Public IP sidder direkte på interfacet — ingen NAT
-    left=$PUBLIC_IP
-    leftid=$PUBLIC_IP
+    # left is the VM's private interface — leftid is the floating IP Azure connects to
+    left=%defaultroute
+    leftid=$FLOATING_IP
     leftsubnet=$ovh_subnet
+
+    # Tvungen UDP-indkapsling pga. NAT (floating IP)
+    forceencaps=yes
 
     # Azure side
     right=$azure_ip
     rightid=$azure_ip
     rightsubnet=$azure_subnet
 
-    # Ingen forceencaps — public IP er direkte på VM, ingen NAT imellem
     ike=aes256-sha256-modp2048!
     esp=aes256-sha256-modp2048!
 
@@ -51,7 +60,7 @@ conn azure-s2s
 EOF
 
 cat <<EOF > /etc/ipsec.secrets
-$PUBLIC_IP $azure_ip : PSK "$azure_psk"
+$FLOATING_IP $azure_ip : PSK "$azure_psk"
 EOF
 
 systemctl enable strongswan-starter
